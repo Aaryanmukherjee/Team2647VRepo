@@ -1,3 +1,42 @@
+// ---- START VEXCODE CONFIGURED DEVICES ----
+// Robot Configuration:
+// [Name]               [Type]        [Port(s)]
+// FL                   motor         16              
+// Controller1          controller                    
+// FR                   motor         17              
+// BR                   motor         14              
+// BL                   motor         11              
+// IntakeUp             motor         6               
+// Sorter               motor         3               
+// IntakeLeft           motor         7               
+// IntakeRight          motor         8               
+// ---- END VEXCODE CONFIGURED DEVICES ----
+// ---- START VEXCODE CONFIGURED DEVICES ----
+// Robot Configuration:
+// [Name]               [Type]        [Port(s)]
+// FL                   motor         16              
+// Controller1          controller                    
+// FR                   motor         17              
+// BR                   motor         14              
+// BL                   motor         11              
+// IntakeUp             motor         6               
+// Sorter               motor         3               
+// IntakeLeft           motor         7               
+// IntakeRight          motor         8               
+// ---- END VEXCODE CONFIGURED DEVICES ----
+// ---- START VEXCODE CONFIGURED DEVICES ----
+// Robot Configuration:
+// [Name]               [Type]        [Port(s)]
+// FL                   motor         16              
+// Controller1          controller                    
+// FR                   motor         17              
+// BR                   motor         14              
+// BL                   motor         11              
+// IntakeUp             motor         6               
+// Sorter               motor         3               
+// IntakeLeft           motor         7               
+// IntakeRight          motor         8               
+// ---- END VEXCODE CONFIGURED DEVICES ----
 /*----------------------------------------------------------------------------*/
 /*                                                                            */
 /*    Module:       main.cpp                                                  */
@@ -47,10 +86,59 @@ motor intakeMotors[] = {IntakeLeft,IntakeRight,IntakeUp};
 
 int arrSize = sizeof(allMotors)/sizeof(allMotors[0]);
 
-//fwd constants 
+// fwd constants
 double leftkP = 1;
+double rightkP = 1;
+double leftkI = 0.000;
+double rightkI = 0.000;
+double leftkD = 0.0;
+double rightkD = 0.0;
+double leftIntActZone = 10.0;
+double rightIntActZone = 10.0;
+
+//strafe constants
+double frontkP = 0.7;
+double backkP = 0.7;
+double frontkI = 0.0003;
+double backkI = 0.0003;
+double frontkD = 0.13;
+double backkD = 0.13;
+double frontIntActZone = 10.0;
+double backIntActZone = 10.0;
+
+//fwd variables
+int leftError; //current - desired
+int rightError;
+int leftPrevError = 0; //error 20 msec ago
+int rightPrevError = 0;
+int leftDerivative; //error - prevError
+int rightDerivative;
+int leftTotalError = 0; //error + totalError
+int rightTotalError = 0;
+int leftIntegral;
+int rightIntegral;
+double leftPower;
+double rightPower;
+
+//strafe variables
+int frontError; //current - desired
+int backError;
+int frontPrevError = 0; //error 20 msec ago
+int backPrevError = 0;
+int frontDerivative; //error - prevError
+int backDerivative;
+int frontTotalError = 0; //error + totalError
+int backTotalError = 0;
+int frontIntegral;
+int backIntegral;
+double frontPower;
+double backPower;
 
 
+motor_group Fdrive(FR,FL);
+motor_group Bdrive(BR,BL);
+motor_group Rdrive(FR,BR);
+motor_group Ldrive(FL,BL);
 
 void stop(){
   for(int i =0; i<arrSize;i=i+1){
@@ -67,17 +155,217 @@ void start(){
     allMotors[i].spin(forward);
   }
 }
-void fwdPID(){
+
+//format of array: target, high speed, low speed
+void fwdPID(float leftArr[], float rightArr[], int t){
+  Brain.Timer.reset();
+ 
+  leftArr[0] = leftArr[0]/.03;
+  rightArr[0] = rightArr[0]/.03;
+  while(Brain.Timer.time(msec) <= t){
+    while((abs(Ldrive.position(degrees)) < abs(leftArr[0])) || (abs(Rdrive.position(degrees)) < abs(rightArr[0]))) {
+      int Lposition = (FL.position(degrees)+BL.position(degrees))/2;
+      int Rposition = (FR.position(degrees)+BR.position(degrees))/2;
+      //int AvgPosition = (Lposition + Rposition)/2;
+      
+      //P
+      leftError = leftArr[0] - Lposition;
+      rightError = leftArr[0] - Rposition;
+
+      //I
+      leftTotalError += leftError;
+      if(abs(leftError) <= abs(leftIntActZone)){
+        leftIntegral = leftTotalError*leftkI;
+      }
+      else{
+        leftIntegral = 0;
+      }
+
+      rightTotalError += rightError;
+      if(abs(rightError) <= abs(rightIntActZone)){
+      rightIntegral = rightTotalError*rightkI;
+      }
+      else{
+        rightIntegral = 0;
+      }
+      //D
+      leftDerivative = leftError - leftPrevError;
+      rightDerivative = rightError - rightPrevError;
+
+      leftPower = (leftError*leftkP) + leftIntegral + (leftDerivative*leftkD);
+      rightPower = (rightError*rightkP) + rightIntegral + (rightDerivative*rightkD);
+
+      if(abs(leftPower) > abs(leftArr[1])){
+        leftPower = leftArr[1];
+      }
+      else if(abs(leftPower) < abs(leftArr[2])){
+        leftPower = leftArr[2];
+      }
+
+      if(abs(rightPower) > abs(rightArr[1])){
+        rightPower = rightArr[1];
+      }
+      else if(abs(rightPower) < abs(rightArr[2])){
+        rightPower = rightArr[2];
+      }
+
+      Ldrive.spin(forward, leftPower, rpm);
+      Rdrive.spin(forward, rightPower, rpm);
+
+      leftPrevError = leftError;
+      rightPrevError = rightError;
+      vex::task::sleep(20);
+    }
+  }
 
 }
-void strafePID(){
+void strafePID(float frontArr[], float backArr[], int t){
+  motor_group Fdrive(FR,FL);
+  motor_group Bdrive(BR,BL);
+  Brain.Timer.reset();
+  int frontValue = frontArr[0]/.03490658503;
+  int backValue = backArr[0]/.03490658503;
+  while(Brain.Timer.time(msec) <= t){
+  while(((abs(FR.position(degrees)) < abs(frontValue)-1) || (abs(FL.position(degrees)) < abs(frontValue)-1) || (abs(BR.position(degrees)) < abs(backValue)-1) || abs(BL.position(degrees)) < abs(backValue)-1)){
+    int Fposition = ((FR.position(degrees)+FL.position(degrees))/2);
+    int Bposition = ((BR.position(degrees)+BL.position(degrees))/2);
+    //int AvgPosition = (Lposition + Rposition)/2;
+    
+    //P
+    frontError = frontValue - Fposition;
+    backError = backValue - Bposition;
 
+    //I
+    frontTotalError += frontError;
+    if(abs(frontError) <= abs(frontIntActZone)){
+      frontIntegral = frontTotalError*frontkI;
+    }
+    else{
+      frontIntegral = 0;
+    }
+
+    backTotalError += backError;
+    if(abs(backError) <= abs(backIntActZone)){
+    backIntegral = backTotalError*backkI;
+    }
+    else{
+      backIntegral = 0;
+    }
+    //D
+    frontDerivative = frontError - frontPrevError;
+    backDerivative = backError - backPrevError;
+
+    frontPower = (frontError*frontkP) + frontIntegral + (frontDerivative*frontkD);
+    backPower = (backError*rightkP) + backIntegral + (backDerivative*backkD);
+
+    if(abs(frontPower) > abs(frontArr[1])){
+      frontPower = frontArr[1];
+    }
+    else if(abs(frontPower) < abs(frontArr[2])){
+      frontPower = frontArr[2];
+    }
+    if(abs(backPower) > abs(backArr[1])){
+      backPower = backArr[1];
+    }
+    else if(abs(backPower) < abs(backArr[2])){
+      backPower = backArr[2];
+    }
+
+    FR.spin(forward, -frontPower, rpm);
+    FL.spin(forward, frontPower, rpm);
+    BR.spin(forward, backPower, rpm);
+    BL.spin(forward, -backPower, rpm);
+
+    frontPrevError = frontError;
+    backPrevError = backError;
+    vex::task::sleep(20);
+  }
+  }
+  Fdrive.stop();
+  Bdrive.stop();
 }
-void leftPID(){
+void leftPID(float leftArr[], int t){
+  
+  Brain.Timer.reset();
+  int leftValue = leftArr[0]/.03490658503;
+  while(Brain.Timer.time(msec) <= t){
+  while(((abs(Ldrive.position(degrees)) < abs(leftValue)-1))){
+    int Lposition = (FL.position(degrees)+BL.position(degrees))/2;
+   
+    //int AvgPosition = (Lposition + Rposition)/2;
+    
+    //P
+    leftError = leftValue - Lposition;
 
+    //I
+    leftTotalError += leftError;
+    if(abs(leftError) <= abs(leftIntActZone)){
+      leftIntegral = leftTotalError*leftkI;
+    }
+    else{
+      leftIntegral = 0;
+    }
+    
+    //D
+    leftDerivative = leftError - leftPrevError;
+
+    leftPower = (leftError*leftkP) + leftIntegral + (leftDerivative*leftkD);
+
+    if(abs(leftPower) > abs(leftArr[1])){
+      leftPower = leftArr[1];
+    }
+
+    else if(abs(leftPower) < abs(leftArr[2])){
+      leftPower = leftArr[2];
+    }
+
+    Ldrive.spin(forward, leftPower, rpm);;
+
+    leftPrevError = leftError;
+    vex::task::sleep(20);
+  }
+  }
 }
-void rightPID(){
+void RightPID(float rightArr[], int t){
+  
+  Brain.Timer.reset();
+  int rightValue = rightArr[0]/.03490658503;
+  while(Brain.Timer.time(msec) <= t){
+  while(((abs(Rdrive.position(degrees)) < abs(rightValue)-1)) ){
+    int Rposition = (FR.position(degrees)+BR.position(degrees))/2;
+    //int AvgPosition = (Lposition + Rposition)/2;
+    
+    //P
+    rightError = rightValue - Rposition;
 
+    //I
+    rightTotalError += rightError;
+    if(abs(rightError) <= abs(rightIntActZone)){
+    rightIntegral = rightTotalError*rightkI;
+    }
+    else{
+      rightIntegral = 0;
+    }
+    //D
+    rightDerivative = rightError - rightPrevError;
+
+    rightPower = (rightError*rightkP) + rightIntegral + (rightDerivative*rightkD);
+
+    if(abs(rightPower) > abs(rightArr[1])){
+      rightPower = rightArr[1];
+    }
+
+    else if(abs(rightPower) < abs(rightArr[2])){
+      rightPower = rightArr[2];
+    }
+
+    Rdrive.spin(forward, rightPower, rpm);
+    
+
+    rightPrevError = rightError;
+    vex::task::sleep(20);
+  }
+  }
 }
 
 
@@ -183,8 +471,7 @@ void usercontrol(void) {
 
     start();
 
-//hello
-    //L1 shoot; L2 sort; R1 intake, R2 Out
+
 
 
     wait(20, msec); // Sleep the task for a short amount of time to
