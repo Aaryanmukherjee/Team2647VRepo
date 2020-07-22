@@ -46,6 +46,12 @@ motor driveMotors[] = {FL,FR,BL,BR};
 motor intakeMotors[] = {IntakeLeft,IntakeRight,IntakeUp};
 
 int arrSize = sizeof(allMotors)/sizeof(allMotors[0]);
+
+//fwd constants 
+double leftkP = 1;
+
+
+
 void stop(){
   for(int i =0; i<arrSize;i=i+1){
     allMotors[i].stop();
