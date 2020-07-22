@@ -40,6 +40,41 @@ competition Competition;
 /*  not every time that the robot is disabled.                               */
 /*---------------------------------------------------------------------------*/
 
+
+motor allMotors[] = {FL,FR,BL,BR,IntakeLeft,IntakeRight,IntakeUp,Sorter};
+motor driveMotors[] = {FL,FR,BL,BR};
+motor intakeMotors[] = {IntakeLeft,IntakeRight,IntakeUp};
+
+int arrSize = sizeof(allMotors)/sizeof(allMotors[0]);
+void stop(){
+  for(int i =0; i<arrSize;i=i+1){
+    allMotors[i].stop();
+  }
+}
+void reset(){
+  for(int i =0; i<arrSize;i=i+1){
+    allMotors[i].resetRotation();
+  }
+}
+void start(){
+  for(int i =0; i<arrSize;i=i+1){
+    allMotors[i].spin(forward);
+  }
+}
+void fwdPID(){
+
+}
+void strafePID(){
+
+}
+void leftPID(){
+
+}
+void rightPID(){
+
+}
+
+
 void pre_auton(void) {
   // Initializing Robot Configuration. DO NOT REMOVE!
   vexcodeInit();
@@ -131,14 +166,16 @@ void usercontrol(void) {
       Sorter.setVelocity(0,percent);
 
     }
-    BR.spin(forward);
-    BL.spin(forward);
-    FR.spin(forward);
-    FL.spin(forward);
-    IntakeLeft.spin(forward);
-    IntakeRight.spin(forward);
-    IntakeUp.spin(forward);
-    Sorter.spin(forward);
+    // BR.spin(forward);
+    // BL.spin(forward);
+    // FR.spin(forward);
+    // FL.spin(forward);
+    // IntakeLeft.spin(forward);
+    // IntakeRight.spin(forward);
+    // IntakeUp.spin(forward);
+    // Sorter.spin(forward);
+
+    start();
 
 //hello
     //L1 shoot; L2 sort; R1 intake, R2 Out
